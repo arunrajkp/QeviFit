@@ -17,11 +17,25 @@ const PORT = process.env.PORT || 5000;
 // Security Middleware
 app.use(helmet());
 app.use(cors({
-    origin: [
-        'http://localhost:3001',  // QeviDiet frontend
-        'http://localhost:3000',  // kept as fallback
-        process.env.FRONTEND_URL || 'http://localhost:3001',
-    ],
+    origin: (origin, callback) => {
+        const allowed = [
+            'http://localhost:3001',
+            'http://localhost:3000',
+            process.env.FRONTEND_URL,           // set this in Railway to your Vercel URL
+        ].filter(Boolean);
+
+        // Allow any Vercel preview/prod URL automatically
+        const isVercel = origin && (
+            origin.endsWith('.vercel.app') ||
+            origin.endsWith('.vercel.sh')
+        );
+
+        if (!origin || isVercel || allowed.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error(`CORS: origin '${origin}' not allowed`));
+        }
+    },
     credentials: true,
 }));
 
