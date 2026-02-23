@@ -8,6 +8,9 @@
     "dev": "nodemon server.js",
     "db:setup": "node scripts/setupDB.js"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "keywords": [
     "diet",
     "AI",
