@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase } from '@/lib/supabase';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -7,34 +8,36 @@ const api = axios.create({
     headers: { 'Content-Type': 'application/json' },
 });
 
-// Inject JWT token on every request
-api.interceptors.request.use((config) => {
+// Inject Supabase access token on every request
+api.interceptors.request.use(async (config) => {
     if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('qevid_token');
+        // Always get the freshest token from Supabase (auto-refreshed)
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || localStorage.getItem('qevid_token');
         if (token) config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
 });
 
-// Handle auth errors globally
+// Handle 401 globally
 api.interceptors.response.use(
     (res) => res,
-    (error) => {
+    async (error) => {
         if (error.response?.status === 401 && typeof window !== 'undefined') {
-            localStorage.removeItem('qevid_token');
-            localStorage.removeItem('qevid_user');
-            window.location.href = '/login';
+            // Try to refresh session once
+            const { data: { session } } = await supabase.auth.refreshSession();
+            if (!session) {
+                await supabase.auth.signOut();
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }
 );
 
-// ─── Auth ────────────────────────────────────────────────────────────────────
+// ─── Auth (backend sync only — login/register done via Supabase client) ───────
 export const authAPI = {
-    register: (data: { name: string; email: string; password: string }) =>
-        api.post('/auth/register', data),
-    login: (data: { email: string; password: string }) =>
-        api.post('/auth/login', data),
+    sync: (data: { name?: string; email?: string }) => api.post('/auth/sync', data),
     me: () => api.get('/auth/me'),
 };
 
@@ -50,7 +53,7 @@ export const profileAPI = {
 // ─── Diet ─────────────────────────────────────────────────────────────────────
 export const dietAPI = {
     getPlan: () => api.get('/diet/plan'),
-    generate: (profile?: Record<string, unknown>) => api.post('/diet/generate', { profile }),
+    generate: () => api.post('/diet/generate', {}),
     getSummary: () => api.get('/diet/summary'),
     getTips: (goal?: string) => api.get(`/diet/tips${goal ? `?goal=${goal}` : ''}`),
 };
@@ -66,8 +69,8 @@ export const logsAPI = {
 // ─── Nutrition ────────────────────────────────────────────────────────────────
 export const nutritionAPI = {
     search: (q: string) => api.get(`/nutrition/search?q=${encodeURIComponent(q)}`),
-    calculate: (food_name: string, quantity_g: number) =>
-        api.get(`/nutrition/calculate?food_name=${encodeURIComponent(food_name)}&quantity_g=${quantity_g}`),
+    calculate: (food_id: string, quantity_g: number) =>
+        api.post('/nutrition/calculate', { food_id, quantity_g }),
     getFoods: (category?: string) =>
         api.get(`/nutrition/foods${category ? `?category=${category}` : ''}`),
 };

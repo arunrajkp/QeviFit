@@ -26,11 +26,17 @@ export default function RegisterPage() {
         setLoading(true);
         try {
             await register(form.name, form.email, form.password);
-            toast.success('Account created! Let\'s set up your profile 🎉');
+            toast.success('Account created! 🎉');
+            // Supabase may require email confirmation — redirect to onboarding
             router.push('/onboarding');
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Registration failed.';
-            toast.error(msg);
+            const msg = (err as { message?: string })?.message || 'Registration failed.';
+            // Handle "email already exists" gracefully
+            if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already exists')) {
+                toast.error('An account with this email already exists. Try logging in.');
+            } else {
+                toast.error(msg);
+            }
         } finally {
             setLoading(false);
         }

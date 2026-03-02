@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../config/db');
 const { authenticate } = require('../middleware/auth');
-const { calculateNutrition, generateWeeklyMealPlan, generateNutritionTips } = require('../utils/nutritionEngine');
+const { calculateNutrition } = require('../utils/nutritionEngine');
 
 /* ─── GET /api/profile ────────────────────────────────────── */
 router.get('/', authenticate, async (req, res) => {
@@ -32,7 +32,6 @@ router.post('/', authenticate, async (req, res) => {
             water_intake_liters, goal, dietary_preference,
         } = req.body;
 
-        // Calculate nutrition targets using the engine
         const nutrition = calculateNutrition({
             age: Number(age),
             gender,
@@ -141,7 +140,6 @@ router.post('/weight-log', authenticate, async (req, res) => {
             .single();
 
         if (error) {
-            // If unique constraint doesn't exist, just insert
             const { data: inserted, error: insErr } = await supabase
                 .from('weight_logs')
                 .insert({ user_id: userId, weight_kg, logged_date: today, notes: notes || null })

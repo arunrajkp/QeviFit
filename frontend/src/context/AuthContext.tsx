@@ -1,8 +1,10 @@
 'use client';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authAPI } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
+import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
 
-interface User {
+/* ─── Types ────────────────────────────────────────────────── */
+interface AppUser {
     id: string;
     name: string;
     email: string;
@@ -11,63 +13,122 @@ interface User {
 }
 
 interface AuthContextType {
-    user: User | null;
+    user: AppUser | null;
+    session: Session | null;
     loading: boolean;
     login: (email: string, password: string) => Promise<void>;
     register: (name: string, email: string, password: string) => Promise<void>;
-    logout: () => void;
-    updateUser: (updates: Partial<User>) => void;
+    logout: () => Promise<void>;
+    updateUser: (updates: Partial<AppUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+/* ─── Helper: map Supabase user → AppUser ──────────────────── */
+function mapUser(su: SupabaseUser, extra?: Partial<AppUser>): AppUser {
+    return {
+        id: su.id,
+        email: su.email || '',
+        name: su.user_metadata?.name || su.email?.split('@')[0] || 'User',
+        plan: su.user_metadata?.plan || 'free',
+        profileCompleted: su.user_metadata?.profileCompleted || false,
+        ...extra,
+    };
+}
+
+/* ─── Provider ─────────────────────────────────────────────── */
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<AppUser | null>(null);
+    const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
 
+    /* On mount: restore session from Supabase (handles token refresh) */
     useEffect(() => {
-        const token = localStorage.getItem('qevid_token');
-        const savedUser = localStorage.getItem('qevid_user');
-        if (token && savedUser) {
-            try {
-                setUser(JSON.parse(savedUser));
-            } catch { /* ignore */ }
-        }
-        setLoading(false);
+        // Get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            if (session?.user) {
+                setUser(mapUser(session.user));
+            }
+            setLoading(false);
+        });
+
+        // Listen for auth state changes (login / logout / token refresh)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+            if (session?.user) {
+                setUser(mapUser(session.user));
+                // Sync Supabase access token to localStorage for backend API calls
+                localStorage.setItem('qevid_token', session.access_token);
+            } else {
+                setUser(null);
+                localStorage.removeItem('qevid_token');
+            }
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
+    /* Login */
     const login = async (email: string, password: string) => {
-        const res = await authAPI.login({ email, password });
-        const { token, user: userData } = res.data;
-        localStorage.setItem('qevid_token', token);
-        localStorage.setItem('qevid_user', JSON.stringify(userData));
-        setUser(userData);
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        if (data.session) {
+            localStorage.setItem('qevid_token', data.session.access_token);
+        }
+        if (data.user) setUser(mapUser(data.user));
     };
 
+    /* Register — creates user in Supabase Auth, stores name in metadata */
     const register = async (name: string, email: string, password: string) => {
-        const res = await authAPI.register({ name, email, password });
-        const { token, user: userData } = res.data;
-        localStorage.setItem('qevid_token', token);
-        localStorage.setItem('qevid_user', JSON.stringify(userData));
-        setUser(userData);
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: { name, plan: 'free', profileCompleted: false },
+            },
+        });
+        if (error) throw error;
+
+        // After signup, also create a row in the public users table via backend
+        if (data.session) {
+            localStorage.setItem('qevid_token', data.session.access_token);
+            // Create user profile entry in backend DB
+            try {
+                await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/sync`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${data.session.access_token}`,
+                    },
+                    body: JSON.stringify({ name, email }),
+                });
+            } catch { /* non-critical, profile route handles this */ }
+        }
+        if (data.user) setUser(mapUser(data.user));
     };
 
-    const logout = () => {
+    /* Logout */
+    const logout = async () => {
+        await supabase.auth.signOut();
         localStorage.removeItem('qevid_token');
-        localStorage.removeItem('qevid_user');
         setUser(null);
+        setSession(null);
+        window.location.href = '/login';
     };
 
-    const updateUser = (updates: Partial<User>) => {
+    /* Update local user state (e.g., after profile save) */
+    const updateUser = (updates: Partial<AppUser>) => {
         if (user) {
             const updated = { ...user, ...updates };
             setUser(updated);
-            localStorage.setItem('qevid_user', JSON.stringify(updated));
+            // Also update Supabase metadata
+            supabase.auth.updateUser({ data: updates }).catch(() => { });
         }
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
+        <AuthContext.Provider value={{ user, session, loading, login, register, logout, updateUser }}>
             {children}
         </AuthContext.Provider>
     );

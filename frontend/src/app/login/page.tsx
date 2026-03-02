@@ -21,7 +21,7 @@ export default function LoginPage() {
             toast.success('Welcome back! 🎉');
             router.push('/dashboard');
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Login failed. Please try again.';
+            const msg = (err as { message?: string })?.message || 'Login failed. Please try again.';
             toast.error(msg);
         } finally {
             setLoading(false);
@@ -123,7 +123,7 @@ export default function LoginPage() {
                 </div>
 
                 <p style={{ textAlign: 'center', marginTop: 20, color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                    🔒 Secured with JWT encryption
+                    🔒 Secured with Supabase Auth
                 </p>
             </motion.div>
         </div>

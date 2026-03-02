@@ -9,7 +9,6 @@ router.post('/generate', authenticate, async (req, res) => {
     try {
         const { userId } = req.user;
 
-        // Fetch profile
         const { data: profile, error: pErr } = await supabase
             .from('user_profiles')
             .select('*')
@@ -31,16 +30,14 @@ router.post('/generate', authenticate, async (req, res) => {
         );
 
         const weekStart = new Date();
-        weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Monday
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
         const weekStartDate = weekStart.toISOString().split('T')[0];
 
-        // Deactivate old plans
         await supabase
             .from('weekly_diet_plans')
             .update({ is_active: false })
             .eq('user_id', userId);
 
-        // Insert new plan
         const { data: plan, error: planErr } = await supabase
             .from('weekly_diet_plans')
             .insert({
@@ -89,14 +86,12 @@ router.get('/summary', authenticate, async (req, res) => {
         const { userId } = req.user;
         const today = new Date().toISOString().split('T')[0];
 
-        // Profile targets
         const { data: profile } = await supabase
             .from('user_profiles')
             .select('goal, bmr, tdee, target_calories, target_protein_g, target_carbs_g, target_fat_g')
             .eq('user_id', userId)
             .maybeSingle();
 
-        // Today's logs aggregate
         const { data: logs } = await supabase
             .from('daily_logs')
             .select('calories, protein_g, carbs_g, fat_g')

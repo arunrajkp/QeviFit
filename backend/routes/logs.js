@@ -65,7 +65,7 @@ router.delete('/:id', authenticate, async (req, res) => {
             .from('daily_logs')
             .delete()
             .eq('id', id)
-            .eq('user_id', userId);  // ensure ownership
+            .eq('user_id', userId);
 
         if (error) throw error;
         return res.json({ message: 'Log entry deleted.' });
@@ -91,7 +91,6 @@ router.get('/weekly', authenticate, async (req, res) => {
 
         if (error) throw error;
 
-        // Group by date (aggregate)
         const byDate = {};
         (logs || []).forEach(l => {
             if (!byDate[l.log_date]) byDate[l.log_date] = { log_date: l.log_date, total_calories: 0, total_protein: 0, total_carbs: 0, total_fat: 0 };
