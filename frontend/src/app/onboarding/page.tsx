@@ -76,7 +76,7 @@ export default function OnboardingPage() {
             });
 
             // Generate diet plan
-            await dietAPI.generate(res.data.profile);
+            await dietAPI.generate();
 
             updateUser({ profileCompleted: true });
             toast.success('Profile set up! Your plan is ready 🎉');

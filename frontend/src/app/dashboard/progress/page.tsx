@@ -93,7 +93,7 @@ export default function ProgressPage() {
                             domain={['auto', 'auto']} />
                         <Tooltip
                             contentStyle={{ background: '#ffffff', border: '1px solid #f1f5f9', borderRadius: 8, fontSize: '0.8rem' }}
-                            formatter={(v: number) => [`${v} kg`, 'Weight']}
+                            formatter={(v) => [`${v ?? 0} kg`, 'Weight']}
                         />
                         <Line type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={2} dot={false} />
                     </LineChart>

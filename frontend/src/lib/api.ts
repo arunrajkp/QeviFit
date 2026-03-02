@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { supabase } from '@/lib/supabase';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+// Always relative — Next.js API routes on the same host (no Railway needed!)
+const API_URL = '/api';
+
 
 const api = axios.create({
     baseURL: API_URL,
