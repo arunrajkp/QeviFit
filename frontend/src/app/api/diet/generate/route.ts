@@ -3,10 +3,9 @@ import { createAdminClient } from '@/lib/supabase-server';
 import { getAuthUser, authError, jsonResponse } from '@/lib/api-auth';
 import { generateWeeklyMealPlan } from '@/lib/nutrition-engine';
 
-// POST /api/diet/generate
 export async function POST(req: NextRequest) {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUser(req);
         const supabase = createAdminClient();
 
         const { data: profile, error: pErr } = await supabase
@@ -33,11 +32,7 @@ export async function POST(req: NextRequest) {
         weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
         const weekStartDate = weekStart.toISOString().split('T')[0];
 
-        // Deactivate old plans
-        await supabase
-            .from('weekly_diet_plans')
-            .update({ is_active: false })
-            .eq('user_id', user.userId);
+        await supabase.from('weekly_diet_plans').update({ is_active: false }).eq('user_id', user.userId);
 
         const { data: plan, error: planErr } = await supabase
             .from('weekly_diet_plans')
@@ -55,7 +50,7 @@ export async function POST(req: NextRequest) {
         if (planErr) throw planErr;
         return jsonResponse({ message: 'Meal plan generated!', plan }, 201);
     } catch (e: unknown) {
-        if ((e as Error).message === 'No token provided') return authError();
+        if ((e as Error).message === 'No token provided' || (e as Error).message?.includes('Invalid')) return authError();
         return jsonResponse({ error: 'Failed to generate meal plan.' }, 500);
     }
 }

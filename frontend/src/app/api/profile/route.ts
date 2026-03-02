@@ -3,10 +3,9 @@ import { createAdminClient } from '@/lib/supabase-server';
 import { getAuthUser, authError, jsonResponse } from '@/lib/api-auth';
 import { calculateNutrition } from '@/lib/nutrition-engine';
 
-// GET /api/profile
 export async function GET(req: NextRequest) {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUser(req);
         const supabase = createAdminClient();
 
         const { data: profile, error } = await supabase
@@ -18,15 +17,14 @@ export async function GET(req: NextRequest) {
         if (error) throw error;
         return jsonResponse({ profile: profile || null });
     } catch (e: unknown) {
-        if ((e as Error).message === 'No token provided') return authError();
+        if ((e as Error).message === 'No token provided' || (e as Error).message?.includes('Invalid')) return authError();
         return jsonResponse({ error: 'Failed to fetch profile.' }, 500);
     }
 }
 
-// POST /api/profile
 export async function POST(req: NextRequest) {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUser(req);
         const supabase = createAdminClient();
         const body = await req.json();
 
@@ -74,7 +72,6 @@ export async function POST(req: NextRequest) {
 
         if (error) throw error;
 
-        // Auto-log starting weight
         if (weight_kg) {
             await supabase.from('weight_logs').upsert({
                 user_id: user.userId, weight_kg,
@@ -92,7 +89,7 @@ export async function POST(req: NextRequest) {
             },
         }, 201);
     } catch (e: unknown) {
-        if ((e as Error).message === 'No token provided') return authError();
+        if ((e as Error).message === 'No token provided' || (e as Error).message?.includes('Invalid')) return authError();
         console.error('Profile save error:', (e as Error).message);
         return jsonResponse({ error: 'Failed to save profile.' }, 500);
     }

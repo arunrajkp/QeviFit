@@ -2,10 +2,9 @@ import { NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase-server';
 import { getAuthUser, authError, jsonResponse } from '@/lib/api-auth';
 
-// GET /api/profile/weight-logs
 export async function GET(req: NextRequest) {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUser(req);
         const supabase = createAdminClient();
 
         const { data: logs, error } = await supabase
@@ -18,15 +17,14 @@ export async function GET(req: NextRequest) {
         if (error) throw error;
         return jsonResponse({ weightLogs: logs || [] });
     } catch (e: unknown) {
-        if ((e as Error).message === 'No token provided') return authError();
+        if ((e as Error).message === 'No token provided' || (e as Error).message?.includes('Invalid')) return authError();
         return jsonResponse({ error: 'Failed to fetch weight logs.' }, 500);
     }
 }
 
-// POST /api/profile/weight-logs
 export async function POST(req: NextRequest) {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUser(req);
         const supabase = createAdminClient();
         const { weight_kg, notes } = await req.json();
 
@@ -46,7 +44,7 @@ export async function POST(req: NextRequest) {
         if (error) throw error;
         return jsonResponse({ message: 'Weight logged!', log }, 201);
     } catch (e: unknown) {
-        if ((e as Error).message === 'No token provided') return authError();
+        if ((e as Error).message === 'No token provided' || (e as Error).message?.includes('Invalid')) return authError();
         return jsonResponse({ error: 'Failed to log weight.' }, 500);
     }
 }

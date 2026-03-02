@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { createClient } from '@supabase/supabase-js';
 
 interface AuthUser {
     userId: string;
@@ -7,31 +7,31 @@ interface AuthUser {
 }
 
 /**
- * Extract and verify the Supabase JWT from Authorization header.
- * Returns the user or throws an error string.
+ * Verify a Supabase JWT by asking Supabase to validate it.
+ * Works with both HS256 (legacy) AND ECC (P-256) signing keys.
+ * No need for SUPABASE_JWT_SECRET at all!
  */
-export function getAuthUser(req: NextRequest): AuthUser {
+export async function getAuthUser(req: NextRequest): Promise<AuthUser> {
     const authHeader = req.headers.get('authorization');
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
     if (!token) throw new Error('No token provided');
 
-    const secret = process.env.SUPABASE_JWT_SECRET;
-    let decoded: { sub?: string; email?: string } & jwt.JwtPayload;
+    // Use Supabase's own auth.getUser() — handles all key types automatically
+    const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { auth: { persistSession: false } }
+    );
 
-    if (secret) {
-        decoded = jwt.verify(token, secret) as typeof decoded;
-    } else {
-        // Dev fallback: decode without verifying signature
-        const raw = jwt.decode(token);
-        if (!raw || typeof raw === 'string') throw new Error('Invalid token');
-        decoded = raw as typeof decoded;
-    }
+    const { data: { user }, error } = await supabase.auth.getUser(token);
 
-    const userId = decoded.sub;
-    if (!userId) throw new Error('Invalid token payload');
+    if (error || !user) throw new Error('Invalid or expired token');
 
-    return { userId, email: decoded.email || '' };
+    return {
+        userId: user.id,
+        email: user.email || '',
+    };
 }
 
 /** Standard JSON error response */

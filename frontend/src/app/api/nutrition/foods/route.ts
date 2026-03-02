@@ -2,10 +2,9 @@ import { NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase-server';
 import { getAuthUser, authError, jsonResponse } from '@/lib/api-auth';
 
-// GET /api/nutrition/foods?category=protein
 export async function GET(req: NextRequest) {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUser(req);
         const supabase = createAdminClient();
         const category = req.nextUrl.searchParams.get('category');
 
@@ -21,7 +20,7 @@ export async function GET(req: NextRequest) {
         if (error) throw error;
         return jsonResponse({ foods: foods || [] });
     } catch (e: unknown) {
-        if ((e as Error).message === 'No token provided') return authError();
+        if ((e as Error).message === 'No token provided' || (e as Error).message?.includes('Invalid')) return authError();
         return jsonResponse({ error: 'Failed to fetch foods.' }, 500);
     }
 }

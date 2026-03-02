@@ -2,10 +2,9 @@ import { NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase-server';
 import { getAuthUser, authError, jsonResponse } from '@/lib/api-auth';
 
-// GET /api/diet/summary
 export async function GET(req: NextRequest) {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUser(req);
         const supabase = createAdminClient();
         const today = new Date().toISOString().split('T')[0];
 
@@ -44,7 +43,7 @@ export async function GET(req: NextRequest) {
             consumed,
         });
     } catch (e: unknown) {
-        if ((e as Error).message === 'No token provided') return authError();
+        if ((e as Error).message === 'No token provided' || (e as Error).message?.includes('Invalid')) return authError();
         return jsonResponse({ error: 'Failed to fetch summary.' }, 500);
     }
 }

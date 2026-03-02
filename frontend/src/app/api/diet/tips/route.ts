@@ -3,10 +3,9 @@ import { createAdminClient } from '@/lib/supabase-server';
 import { getAuthUser, authError, jsonResponse } from '@/lib/api-auth';
 import { generateNutritionTips } from '@/lib/nutrition-engine';
 
-// GET /api/diet/tips
 export async function GET(req: NextRequest) {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUser(req);
         const supabase = createAdminClient();
 
         const { data: profile } = await supabase
@@ -18,7 +17,7 @@ export async function GET(req: NextRequest) {
         const tips = generateNutritionTips(profile?.goal || 'maintenance', profile?.dietary_preference);
         return jsonResponse({ tips });
     } catch (e: unknown) {
-        if ((e as Error).message === 'No token provided') return authError();
+        if ((e as Error).message === 'No token provided' || (e as Error).message?.includes('Invalid')) return authError();
         return jsonResponse({ error: 'Failed to fetch tips.' }, 500);
     }
 }

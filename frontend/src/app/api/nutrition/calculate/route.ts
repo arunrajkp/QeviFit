@@ -2,10 +2,9 @@ import { NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase-server';
 import { getAuthUser, authError, jsonResponse } from '@/lib/api-auth';
 
-// POST /api/nutrition/calculate
 export async function POST(req: NextRequest) {
     try {
-        const user = getAuthUser(req);
+        const user = await getAuthUser(req);
         const supabase = createAdminClient();
         const { food_id, quantity_g } = await req.json();
 
@@ -30,7 +29,7 @@ export async function POST(req: NextRequest) {
             fiber_g: parseFloat((food.fiber_per_100g * factor).toFixed(2)),
         });
     } catch (e: unknown) {
-        if ((e as Error).message === 'No token provided') return authError();
+        if ((e as Error).message === 'No token provided' || (e as Error).message?.includes('Invalid')) return authError();
         return jsonResponse({ error: 'Calculation failed.' }, 500);
     }
 }

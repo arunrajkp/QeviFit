@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem('qevid_token', data.session.access_token);
             // Create user profile entry in backend DB
             try {
-                await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/sync`, {
+                await fetch('/api/auth/sync', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     },
                     body: JSON.stringify({ name, email }),
                 });
-            } catch { /* non-critical, profile route handles this */ }
+            } catch { /* non-critical */ }
         }
         if (data.user) setUser(mapUser(data.user));
     };
